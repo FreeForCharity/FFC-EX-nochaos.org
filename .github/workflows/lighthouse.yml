@@ -1,0 +1,70 @@
+name: Lighthouse CI
+
+on:
+  # Run after deployment workflow completes on main branch
+  workflow_run:
+    workflows: ['Deploy to GitHub Pages']
+    types:
+      - completed
+    branches: ['main']
+
+  # Run on pull requests
+  pull_request:
+    branches: ['main']
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  lighthouse:
+    # Only run on successful deployment, PR, or manual trigger
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Stage site for Lighthouse
+        id: stage
+        # lighthouserc.json serves the static export at the domain root and
+        # audits root-relative URLs. That matches a custom-domain deploy, but
+        # this repo deploys to the default GitHub Pages subpath
+        # (/<repo-name>/) — served from the root, path expectations differ
+        # and Lighthouse could audit the wrong URL structure. Nest the site
+        # under the same subpath the production Pages deploy uses and audit
+        # the subpath URLs instead (pattern from FFC-EX-catnipandcattitude.org).
+        run: |
+          if [ -s "public/CNAME" ]; then
+            echo "flags=" >> "$GITHUB_OUTPUT"
+          else
+            base="/${GITHUB_REPOSITORY#*/}"
+            mkdir -p "_lhci-site${base}"
+            cp -r public/. "_lhci-site${base}/"
+            flags="--collect.staticDistDir=./_lhci-site"
+            flags="$flags --collect.url=http://localhost${base}/index.html"
+            echo "flags=$flags" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Lighthouse CI
+        run: |
+          npm install -g @lhci/cli
+          lhci autorun ${{ steps.stage.outputs.flags }}
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+      - name: Upload Lighthouse reports
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: lighthouse-reports
+          path: .lighthouseci
+          retention-days: 30

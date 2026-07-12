@@ -1,0 +1,15 @@
+wp-site-blocks {
+  --wp--style--root--padding-top: var(--wp--preset--spacing--0) !important;
+		
+		    --wp--style--root--padding-bottom: var(--wp--preset--spacing--0) !important;
+}
+
+#wp--skip-link--target{
+margin-top:0px !important;
+}
+
+.wp-site-blocks{
+     padding-top: 0 !important;
+		     padding-bottom: 0 !important;
+
+}

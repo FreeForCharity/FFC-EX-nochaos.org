@@ -1,0 +1,40 @@
+name: CI - Build and Test
+
+on:
+  # Runs on all pull requests
+  pull_request:
+    branches: ['main']
+
+  # Runs on pushes to main (before deploy)
+  push:
+    branches: ['main']
+
+  # Allows manual trigger from Actions tab
+  workflow_dispatch:
+
+# Cancel in-progress CI runs for the same PR/branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-build:
+    name: Test and Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Verify site structure
+        run: |
+          test -f public/index.html || { echo "::error::public/index.html missing"; exit 1; }
+          echo "Site root OK: $(find public -name '*.html' | wc -l) HTML pages"
+
+      - name: Verify full asset localization (no external asset hosts)
+        run: python scripts/check_assets.py public
